@@ -1,0 +1,39 @@
+name: Release lib-ml to GitHub Packages
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.8'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install setuptools wheel twine
+
+      - name: Build package
+        run: python setup.py sdist bdist_wheel
+
+      - name: Publish to GitHub Packages
+        env:
+          TWINE_USERNAME: ${{ github.actor }}
+          TWINE_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          twine upload \
+            --repository-url https://upload.pkg.github.com/remla25-teamX/ \
+            dist/* \
+            --skip-existing
