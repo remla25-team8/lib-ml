@@ -34,6 +34,6 @@ jobs:
           TWINE_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
         run: |
           twine upload \
-            --repository-url https://upload.pkg.github.com/remla25-team8/lib-ml/ \
+            --repository-url https://upload.pkg.github.com/remla25-team8/ \
             dist/* \
             --skip-existing
