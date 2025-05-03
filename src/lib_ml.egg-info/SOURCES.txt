@@ -11,6 +11,8 @@ setup.py
 .idea/misc.xml
 .idea/modules.xml
 .idea/vcs.xml
+dist/lib_ml-0.1.4-py3-none-any.whl
+dist/lib_ml-0.1.4.tar.gz
 src/lib_ml/__init__.py
 src/lib_ml/preprocessor.py
 src/lib_ml.egg-info/PKG-INFO

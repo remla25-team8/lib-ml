@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="remla25-team8-lib-ml",
+    name="lib-ml",
     version="0.1.7",
     author="remla25-team8",
     description="Restaurant Sentiment Analysis",

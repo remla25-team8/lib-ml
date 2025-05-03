@@ -24,20 +24,23 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install setuptools wheel twine
-          pip list
+          pip list 
+
+      - name: Clean dist folder
+        run: |
+          rm -rf dist/* 
+          ls -l dist/ || echo "dist/ is empty"
 
       - name: Build package
         run: |
           python setup.py sdist bdist_wheel
           ls -l dist/ 
 
-      - name: Publish to GitHub Packages
+      - name: Upload to GitHub Release
         env:
-          TWINE_USERNAME: ${{ github.actor }}
-          TWINE_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          twine upload \
-            --repository-url https://upload.packages.github.com/remla25-team8/ \
-            dist/* \
-            --skip-existing \
-            --verbose
+          gh release create "${{ github.ref_name }}" \
+            --title "${{ github.ref_name }}" \
+            --notes "Release ${{ github.ref_name }}" \
+            dist/*
