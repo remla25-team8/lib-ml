@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="lib-ml",
-    version="0.1.8",
+    version="0.1.9",
     author="remla25-team8",
     description="Restaurant Sentiment Analysis",
     long_description=open("README.md").read(),
