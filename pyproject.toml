@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=64", "wheel", "setuptools-scm[toml]>=7"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lib-ml"
+description = "This is the lib-ml package."
+authors = [{name = "Team8", email = "Y.Huang-51@student.tudelft.nl"}]
+readme = "README.md"
+requires-python = ">=3.9"
+dynamic = ["version"]
+
+[tool.setuptools_scm]
+version_scheme = "post-release"
+local_scheme = "no-local-version"
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff", "pre-commit"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+pythonpath = ["src"]
