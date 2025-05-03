@@ -1,11 +1,13 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="remla25-teamX-lib-ml",
-    version="0.1.1",
+    name="remla25-team8-lib-ml",
+    version="0.1.0",
     author="remla25-team8",
     description="Restaurant Sentiment Analysis",
-    url="https://github.com/remla25-team8/lib-ml",
+    long_description=open("README.md").read(),
+    long_description_content_type="text/markdown",
+    url="https://github.com/remla25-team8/remla25-team8-lib-ml",
     packages=find_packages(where="src"),
     package_dir={"": "src"},
     install_requires=[

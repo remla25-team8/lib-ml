@@ -15,7 +15,7 @@ class TestPreprocessor(unittest.TestCase):
                             "Best restaurant in town with excellent customer care",
                             "Disappointing meal and overpriced drinks",
                             "Wonderful ambiance and attentive staff"
-                        ]
+                        ] * 100
         self.preprocessor.vectorize(sample_corpus)
 
     def test_preprocess(self):
