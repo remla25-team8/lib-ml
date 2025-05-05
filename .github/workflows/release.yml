@@ -36,19 +36,6 @@ jobs:
           python -m build
           ls -l dist/
 
-      - name: Publish GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          name: Release ${{ github.ref_name }}
-          draft: false
-          prerelease: ${{ contains(github.ref_name, '-pre') }}
-          body: |
-            ## Docker images
-
-            - `ghcr.io/${{ steps.owner.outputs.NAME }}/lib-ml:${{ steps.vars.outputs.VER }}`
-            - `ghcr.io/${{ steps.owner.outputs.NAME }}/lib-ml:latest`
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
