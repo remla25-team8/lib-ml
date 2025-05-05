@@ -36,16 +36,19 @@ jobs:
           python -m build
           ls -l dist/
 
-      - name: Publish to GitHub Packages
-        env:
-          OWNER: ${{ github.repository_owner }}
-          GH_TOKEN: ${{ secrets.GH_PAT }}
-          USERNAME: ${{ github.actor }}
-        run: |
-          python -m pip install --upgrade twine
-          UPLOAD_URL="https://api.github.com/orgs/${OWNER}/packages/pypi/upload"
-          twine upload --repository-url "$UPLOAD_URL" \
-                       -u "$USERNAME" -p "$GH_TOKEN" dist/*
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-pre') }}
+          body: |
+            ## Docker images
+
+            - `ghcr.io/${{ steps.owner.outputs.NAME }}/lib-ml:${{ steps.vars.outputs.VER }}`
+            - `ghcr.io/${{ steps.owner.outputs.NAME }}/lib-ml:latest`
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
