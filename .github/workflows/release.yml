@@ -8,6 +8,7 @@ on:
 permissions:
   contents: write
   packages: write
+
 jobs:
   publish:
     runs-on: ubuntu-latest
@@ -19,27 +20,32 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.8'
+          python-version: '3.9'
 
       - name: Extract version
         id: vars
         run: echo "PKG_VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
-      - name: Inject version into lib_ml/__init__.py
+      - name: Inject version into package
         run: |
           sed -i "s/__version__ = .*/__version__ = \"${{ steps.vars.outputs.PKG_VERSION }}\"/" src/lib_ml/__init__.py
 
-      - name: Build package
+      - name: Build wheel & sdist
         run: |
-          python -m pip install --upgrade build
+          python -m pip install --upgrade pip build
           python -m build
+          ls -l dist/
 
       - name: Publish to GitHub Packages
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          password: ${{ secrets.GH_PAT }}
-          repository_type: github
-
+        env:
+          OWNER: ${{ github.repository_owner }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+          USERNAME: ${{ github.actor }}
+        run: |
+          python -m pip install --upgrade twine
+          UPLOAD_URL="https://api.github.com/orgs/${OWNER}/packages/pypi/upload"
+          twine upload --repository-url "$UPLOAD_URL" \
+                       -u "$USERNAME" -p "$GH_TOKEN" dist/*
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -50,3 +56,9 @@ jobs:
           files: |
             dist/*.whl
             dist/*.tar.gz
+          body: |
+            **Python package published!**
+            
+            ```bash
+            pip install --extra-index-url https://pkg.github.com/${{ github.repository_owner }} lib-ml==${{ steps.vars.outputs.PKG_VERSION }}
+            ```
