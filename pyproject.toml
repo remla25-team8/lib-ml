@@ -9,6 +9,10 @@ authors = [{name = "Team8", email = "Y.Huang-51@student.tudelft.nl"}]
 readme = "README.md"
 requires-python = ">=3.9"
 dynamic = ["version"]
+dependencies = [
+    "scikit-learn>=1.4",
+    "nltk>=3.8",
+]
 
 [tool.setuptools_scm]
 version_scheme = "post-release"
