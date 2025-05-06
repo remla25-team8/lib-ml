@@ -1,85 +1,47 @@
-name: Create lib-ml Prerelease to GitHub Packages
+name: Create Pre-release
 
 on:
-  push:
-    branches:
-      - main
-
-permissions:
-  contents: write
-  packages: write
+  release:
+    types: [published]
 
 jobs:
-  prerelease:
+  create-prerelease:
+    if: |
+      !contains(github.event.release.tag_name, '-pre') &&
+      github.repository != 'remla25-team8/operation'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Calculate next pre-release version
+        id: version
+        run: |
+          # Extract base version (v1.2.3 -> 1.2.3)
+          BASE_VERSION=$(echo "${{ github.event.release.tag_name }}" | sed 's/^v//')
+          
+          # Split into major.minor.patch
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE_VERSION"
+          
+          # Increment PATCH version (1.2.3 -> 1.2.4-pre)
+          NEXT_PATCH=$((PATCH + 1))
+          NEXT_VERSION="v${MAJOR}.${MINOR}.${NEXT_PATCH}-pre"
+          STABLE_VERSION="v${MAJOR}.${MINOR}.${NEXT_PATCH}"
+          
+          echo "next_version=${NEXT_VERSION}" >> $GITHUB_OUTPUT
+          echo "stable_version=${STABLE_VERSION}" >> $GITHUB_OUTPUT
+          echo "Created pre-release version: ${NEXT_VERSION}"
+
+      - name: Create pre-release
+        uses: softprops/action-gh-release@v1
         with:
-          fetch-depth: 0
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.9'
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install gitpython
-
-      - name: Determine latest release and calculate prerelease version
-        id: versioning
-        run: |
-          git fetch --tags
-          LATEST_TAG=$(git describe --tags --abbrev=0)
-          LATEST_VERSION=${LATEST_TAG#v} # Remove 'v' prefix
-          # Split version into major, minor, patch
-          IFS='.' read -r MAJOR MINOR PATCH <<< "$LATEST_VERSION"
-          # Increment patch version and append -pre
-          NEW_VERSION="$MAJOR.$MINOR.$((PATCH + 1))-pre"
-          echo "Latest release: $LATEST_VERSION"
-          echo "New prerelease version: $NEW_VERSION"
-          echo "PKG_VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
-          echo "TAG_VERSION=v$NEW_VERSION" >> $GITHUB_OUTPUT
-
-      - name: Inject version into package
-        run: |
-          sed -i "s/__version__ = .*/__version__ = \"${{ steps.versioning.outputs.PKG_VERSION }}\"/" src/lib_ml/__init__.py
-
-      - name: Commit version update
-        run: |
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-          git add src/lib_ml/__init__.py
-          git commit -m "Bump version to ${{ steps.versioning.outputs.PKG_VERSION }} for prerelease"
-          git push
-
-      - name: Create prerelease tag
-        run: |
-          git tag ${{ steps.versioning.outputs.TAG_VERSION }}
-          git push origin ${{ steps.versioning.outputs.TAG_VERSION }}
-
-      - name: Build wheel & sdist
-        run: |
-          python -m pip install --upgrade build
-          python -m build
-          ls -l dist/
-
-      - name: Create GitHub Prerelease
-        uses: softprops/action-gh-release@v2
-        with:
-          token: ${{ secrets.GH_PAT }}
-          name: Prerelease ${{ steps.versioning.outputs.PKG_VERSION }}
-          draft: false
-          prerelease: true
-          files: |
-            dist/*.whl
-            dist/*.tar.gz
+          tag_name: ${{ steps.version.outputs.next_version }}
+          name: "Pre-release ${{ steps.version.outputs.next_version }}"
           body: |
-            **Python prerelease package published!**
+            Automated pre-release for testing.
             
-            ```bash
-            pip install --extra-index-url https://pkg.github.com/${{ github.repository_owner }} lib-ml==${{ steps.versioning.outputs.PKG_VERSION }}
-            ```
+            **Parent Release**: ${{ github.event.release.tag_name }}
+            
+            This pre-release will become ${{ steps.version.outputs.stable_version }} when stable.
+          prerelease: true
+          draft: false
