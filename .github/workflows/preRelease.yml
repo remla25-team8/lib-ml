@@ -14,8 +14,13 @@ jobs:
       contents: write
 
     steps:
-      - name: Calculate next pre-release version
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Calculate next pre-release version with iteration
         id: version
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Extract base version (v1.2.3 -> 1.2.3)
           BASE_VERSION=$(echo "${{ github.event.release.tag_name }}" | sed 's/^v//')
@@ -23,25 +28,62 @@ jobs:
           # Split into major.minor.patch
           IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE_VERSION"
           
-          # Increment PATCH version (1.2.3 -> 1.2.4-pre)
+          # Increment PATCH version (1.2.3 -> 1.2.4)
           NEXT_PATCH=$((PATCH + 1))
-          NEXT_VERSION="v${MAJOR}.${MINOR}.${NEXT_PATCH}-pre"
+          BASE_PRE_VERSION="v${MAJOR}.${MINOR}.${NEXT_PATCH}-pre"
           STABLE_VERSION="v${MAJOR}.${MINOR}.${NEXT_PATCH}"
+          
+          echo "Base pre-release version would be: ${BASE_PRE_VERSION}"
+          
+          # Get all existing releases using GitHub API
+          EXISTING_RELEASES=$(gh api repos/${{ github.repository }}/releases --paginate -q '.[].tag_name' || echo "")
+          
+          # Find the highest iteration number for this pre-release version
+          MAX_ITERATION=0
+          ITERATION_FOUND=false
+          
+          # Check if base pre-release version exists
+          if echo "$EXISTING_RELEASES" | grep -q "^${BASE_PRE_VERSION}$"; then
+            ITERATION_FOUND=true
+            MAX_ITERATION=0
+          fi
+          
+          # Check for existing iterations (-pre-1, -pre-2, etc.)
+          for release in $EXISTING_RELEASES; do
+            if [[ "$release" =~ ^v${MAJOR}\.${MINOR}\.${NEXT_PATCH}-pre-([0-9]+)$ ]]; then
+              ITERATION_FOUND=true
+              ITERATION_NUM=${BASH_REMATCH[1]}
+              if [ "$ITERATION_NUM" -gt "$MAX_ITERATION" ]; then
+                MAX_ITERATION=$ITERATION_NUM
+              fi
+            fi
+          done
+          
+          # Determine the next version
+          if [ "$ITERATION_FOUND" = true ]; then
+            NEXT_ITERATION=$((MAX_ITERATION + 1))
+            NEXT_VERSION="v${MAJOR}.${MINOR}.${NEXT_PATCH}-pre-${NEXT_ITERATION}"
+            echo "Found existing pre-release versions, creating: ${NEXT_VERSION}"
+          else
+            NEXT_VERSION="$BASE_PRE_VERSION"
+            echo "No existing pre-release versions found, creating: ${NEXT_VERSION}"
+          fi
           
           echo "next_version=${NEXT_VERSION}" >> $GITHUB_OUTPUT
           echo "stable_version=${STABLE_VERSION}" >> $GITHUB_OUTPUT
-          echo "Created pre-release version: ${NEXT_VERSION}"
+          echo "iteration_number=${NEXT_ITERATION:-0}" >> $GITHUB_OUTPUT
+          echo "Final pre-release version: ${NEXT_VERSION}"
 
       - name: Create pre-release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: ${{ steps.version.outputs.next_version }}
-          name: "Pre-release ${{ steps.version.outputs.next_version }}"
-          body: |
-            Automated pre-release for testing.
-            
-            **Parent Release**: ${{ github.event.release.tag_name }}
-            
-            This pre-release will become ${{ steps.version.outputs.stable_version }} when stable.
-          prerelease: true
-          draft: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ steps.version.outputs.next_version }}" \
+            --title "Pre-release ${{ steps.version.outputs.next_version }}" \
+            --notes "Automated pre-release for testing.
+          
+          **Parent Release**: ${{ github.event.release.tag_name }}
+          **Iteration**: ${{ steps.version.outputs.iteration_number }}
+          
+          This pre-release will become ${{ steps.version.outputs.stable_version }} when stable." \
+            --prerelease

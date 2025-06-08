@@ -52,3 +52,8 @@ jobs:
             ```bash
             pip install --extra-index-url https://pkg.github.com/${{ github.repository_owner }} lib-ml==${{ steps.vars.outputs.PKG_VERSION }}
             ```
+            
+            **Version Details:**
+            - Release Type: ${{ contains(github.ref_name, '-pre') && 'Pre-release' || 'Stable Release' }}
+            - Tag: ${{ github.ref_name }}
+            - Commit: ${{ github.sha }}
