@@ -1,0 +1,165 @@
+name: Development Pre-release
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - development
+  workflow_dispatch:
+    inputs:
+      base_version:
+        description: 'Base version for pre-release (e.g., 1.2.3)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  create-dev-prerelease:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine base version
+        id: base_version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            # Use manual input
+            BASE_VERSION="${{ github.event.inputs.base_version }}"
+          else
+            # Get the latest release version from git tags
+            LATEST_TAG=$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n1 | sed 's/^v//' || echo "0.0.0")
+            if [ "$LATEST_TAG" = "0.0.0" ]; then
+              echo "No previous release found, using 0.1.0"
+              BASE_VERSION="0.1.0"
+            else
+              # Increment patch version for development
+              IFS='.' read -r MAJOR MINOR PATCH <<< "$LATEST_TAG"
+              NEXT_PATCH=$((PATCH + 1))
+              BASE_VERSION="$MAJOR.$MINOR.$NEXT_PATCH"
+            fi
+          fi
+          
+          echo "Using base version: $BASE_VERSION"
+          echo "base_version=$BASE_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Calculate next iteration pre-release version
+        id: version
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BASE_VERSION="${{ steps.base_version.outputs.base_version }}"
+          BASE_PRE_VERSION="v${BASE_VERSION}-pre"
+          
+          echo "Base pre-release version would be: ${BASE_PRE_VERSION}"
+          
+          # Get all existing releases using GitHub API
+          EXISTING_RELEASES=$(gh api repos/${{ github.repository }}/releases --paginate -q '.[].tag_name' || echo "")
+          
+          # Find the highest iteration number for this pre-release version
+          MAX_ITERATION=0
+          ITERATION_FOUND=false
+          
+          # Split base version for regex matching
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE_VERSION"
+          
+          # Check if base pre-release version exists
+          if echo "$EXISTING_RELEASES" | grep -q "^${BASE_PRE_VERSION}$"; then
+            ITERATION_FOUND=true
+            MAX_ITERATION=0
+          fi
+          
+          # Check for existing iterations (-pre-1, -pre-2, etc.)
+          for release in $EXISTING_RELEASES; do
+            if [[ "$release" =~ ^v${MAJOR}\.${MINOR}\.${PATCH}-pre-([0-9]+)$ ]]; then
+              ITERATION_FOUND=true
+              ITERATION_NUM=${BASH_REMATCH[1]}
+              if [ "$ITERATION_NUM" -gt "$MAX_ITERATION" ]; then
+                MAX_ITERATION=$ITERATION_NUM
+              fi
+            fi
+          done
+          
+          # Determine the next version
+          if [ "$ITERATION_FOUND" = true ]; then
+            NEXT_ITERATION=$((MAX_ITERATION + 1))
+            NEXT_VERSION="v${BASE_VERSION}-pre-${NEXT_ITERATION}"
+            echo "Found existing pre-release versions, creating: ${NEXT_VERSION}"
+          else
+            NEXT_VERSION="$BASE_PRE_VERSION"
+            NEXT_ITERATION=0
+            echo "No existing pre-release versions found, creating: ${NEXT_VERSION}"
+          fi
+          
+          echo "next_version=${NEXT_VERSION}" >> $GITHUB_OUTPUT
+          echo "iteration_number=${NEXT_ITERATION}" >> $GITHUB_OUTPUT
+          echo "base_version_full=v${BASE_VERSION}" >> $GITHUB_OUTPUT
+          echo "Final pre-release version: ${NEXT_VERSION}"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+
+      - name: Inject version into package
+        run: |
+          VERSION_WITHOUT_V=$(echo "${{ steps.version.outputs.next_version }}" | sed 's/^v//')
+          sed -i "s/^__version__ = \".*\"$/__version__ = \"$VERSION_WITHOUT_V\"/" src/lib_ml/__init__.py
+          echo "Injected version: $VERSION_WITHOUT_V"
+
+      - name: Run tests
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
+          python -m unittest discover tests -v
+
+      - name: Build wheel & sdist
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build
+          ls -l dist/
+
+      - name: Create development pre-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Get recent commits for release notes
+          RECENT_COMMITS=$(git log --oneline -10 --pretty=format:"- %s (%h)" || echo "- No recent commits found")
+          
+          gh release create "${{ steps.version.outputs.next_version }}" \
+            --title "Development Pre-release ${{ steps.version.outputs.next_version }}" \
+            --notes "🚧 **Development Pre-release** - Iteration ${{ steps.version.outputs.iteration_number }}
+          
+          This is an automated development pre-release for testing and integration.
+          
+          **Base Version**: ${{ steps.version.outputs.base_version_full }}
+          **Branch**: ${{ github.ref_name }}
+          **Commit**: ${{ github.sha }}
+          **Triggered by**: ${{ github.event_name }}
+          
+          ## Recent Changes
+          $RECENT_COMMITS
+          
+          ## Installation
+          \`\`\`bash
+          pip install --extra-index-url https://pkg.github.com/${{ github.repository_owner }} lib-ml==${{ steps.version.outputs.next_version }}
+          \`\`\`
+          
+          ⚠️ **This is a pre-release version intended for testing only.**" \
+            --prerelease \
+            dist/*.whl \
+            dist/*.tar.gz
+
+      - name: Log release info
+        run: |
+          echo "✅ Successfully created development pre-release: ${{ steps.version.outputs.next_version }}"
+          echo "🔗 Release URL: https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.next_version }}"
+          echo "📦 Iteration number: ${{ steps.version.outputs.iteration_number }}" 
