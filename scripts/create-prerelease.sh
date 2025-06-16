@@ -112,7 +112,7 @@ echo -e "${BLUE}🔧 Preparing release...${NC}"
 
 # Update version in __init__.py
 VERSION_WITHOUT_V=$(echo "$NEXT_VERSION" | sed 's/^v//')
-sed -i.bak "s/^__version__ = \".*\"$/__version__ = \"$VERSION_WITHOUT_V\"/" src/lib_ml/__init__.py
+$SED_COMMAND "s/^__version__ = \".*\"$/__version__ = \"$VERSION_WITHOUT_V\"/" src/lib_ml/__init__.py
 echo -e "${GREEN}✅ Updated version in src/lib_ml/__init__.py${NC}"
 
 # Run tests
